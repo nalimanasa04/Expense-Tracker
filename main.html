@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Expense Tracker 💼</title>
+  <link rel="stylesheet" href="main.css" />
+</head>
+<body>
+  <!-- ===== Navbar ===== -->
+  <nav class="navbar">
+    <h2>Expense Tracker 💼</h2>
+    <button id="logoutBtn" class="logout-btn">Logout</button>
+  </nav>
+
+  <!-- ===== Message Box ===== -->
+  <div id="messageBox" class="message-box"></div>
+
+  <!-- ===== Main Container ===== -->
+  <div class="container">
+    <!-- ===== Input Section ===== -->
+    <div class="input-section">
+      <label>💵 Amount</label>
+      <input type="number" id="amount" placeholder="Enter amount" />
+
+      <label>📂 Type</label>
+      <select id="type">
+        <option value="Income">Income</option>
+        <option value="Expense">Expense</option>
+      </select>
+
+      <label>🏷️ Category</label>
+      <input type="text" id="category" placeholder="e.g. Salary, Food, Rent" />
+
+      <label>📅 Date</label>
+      <input type="date" id="date" />
+
+      <button id="addBtn" title="Add Transaction">+</button>
+    </div>
+
+    <!-- ===== Summary Section ===== -->
+    <section class="summary">
+      <div class="card income">
+        <h3>Total Income 💰</h3>
+        <p id="totalIncome">₹0</p>
+      </div>
+      <div class="card expense">
+        <h3>Total Expense 💸</h3>
+        <p id="totalExpense">₹0</p>
+      </div>
+      <div class="card balance">
+        <h3>Balance 🪙</h3>
+        <p id="balance">₹0</p>
+      </div>
+    </section>
+
+    <!-- ===== Transactions Table ===== -->
+    <table>
+      <thead>
+        <tr>
+          <th>💵 Amount</th>
+          <th>📂 Type</th>
+          <th>🏷️ Category</th>
+          <th>📅 Date</th>
+          <th>🧹 Action</th>
+        </tr>
+      </thead>
+      <tbody id="transactionTable"></tbody>
+    </table>
+  </div>
+
+  <!-- ===== Footer ===== -->
+  <footer>
+    <p>💼 Expense Tracker | Built by Bhavani © 2025</p>
+  </footer>
+
+  <!-- ===== JavaScript Logic ===== -->
+<script>
+  const currentUser = JSON.parse(localStorage.getItem("currentUser"));
+  const users = JSON.parse(localStorage.getItem("users")) || [];
+
+  if (!currentUser) {
+    alert("Please login first!");
+    window.location.href = "login.html";
+  }
+
+  const amountInput = document.getElementById("amount");
+  const typeInput = document.getElementById("type");
+  const categoryInput = document.getElementById("category");
+  const dateInput = document.getElementById("date");
+  const addBtn = document.getElementById("addBtn");
+  const tableBody = document.getElementById("transactionTable");
+  const totalIncomeEl = document.getElementById("totalIncome");
+  const totalExpenseEl = document.getElementById("totalExpense");
+  const balanceEl = document.getElementById("balance");
+  const messageBox = document.getElementById("messageBox");
+
+  let user = users.find(u => u.email === currentUser.email);
+  let editIndex = null; // track index being edited
+
+  function showMessage(text, color) {
+    messageBox.textContent = text;
+    messageBox.style.background = color;
+    messageBox.style.display = "block";
+    setTimeout(() => { messageBox.style.display = "none"; }, 2000);
+  }
+
+  function loadTransactions() {
+    tableBody.innerHTML = "";
+    let totalIncome = 0, totalExpense = 0;
+
+    user.expenses.forEach((tx, index) => {
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td>₹${tx.amount}</td>
+        <td>${tx.type}</td>
+        <td>${tx.category || "-"}</td>
+        <td>${tx.date}</td>
+        <td>
+          <button class="editBtn" data-index="${index}">✏️</button>
+          <button class="deleteBtn" data-index="${index}">🗑️</button>
+        </td>
+      `;
+      tableBody.appendChild(row);
+
+      if (tx.type === "Income") totalIncome += tx.amount;
+      else totalExpense += tx.amount;
+    });
+
+    totalIncomeEl.textContent = `₹${totalIncome}`;
+    totalExpenseEl.textContent = `₹${totalExpense}`;
+    const balance = totalIncome - totalExpense;
+    balanceEl.textContent = `₹${balance}`;
+
+    // ⚠️ Negative Balance Alert
+    if (balance < 0) {
+      balanceEl.style.color = "red";
+      alert("⚠️ Warning: Your balance is negative! Please review your expenses.");
+      showMessage("⚠️ Balance is negative!", "#ffcccc");
+    } else {
+      balanceEl.style.color = "#1565c0";
+    }
+  }
+
+  // Add or Update Transaction
+  addBtn.addEventListener("click", () => {
+    const amount = parseFloat(amountInput.value);
+    const type = typeInput.value;
+    const category = categoryInput.value.trim();
+    const date = dateInput.value;
+
+    if (!amount || !date) {
+      showMessage("⚠️ Please enter amount and date!", "#ffcccb");
+      return;
+    }
+
+    if (editIndex !== null) {
+      // Update existing record
+      user.expenses[editIndex] = { amount, type, category, date };
+      showMessage("✅ Transaction updated!", "#bbdefb");
+      addBtn.textContent = "+";
+      editIndex = null;
+    } else {
+      // Add new record
+      user.expenses.push({ amount, type, category, date });
+      showMessage("✅ Transaction added!", "#c8e6c9");
+    }
+
+    // Save changes
+    const updatedUsers = users.map(u => u.email === user.email ? user : u);
+    localStorage.setItem("users", JSON.stringify(updatedUsers));
+    localStorage.setItem("currentUser", JSON.stringify(user));
+
+    // Reset inputs
+    amountInput.value = "";
+    categoryInput.value = "";
+    dateInput.value = "";
+
+    loadTransactions();
+  });
+
+  // Delete or Edit
+  tableBody.addEventListener("click", (e) => {
+    const index = e.target.getAttribute("data-index");
+    if (e.target.classList.contains("deleteBtn")) {
+      user.expenses.splice(index, 1);
+      showMessage("🗑️ Transaction deleted!", "#ffcdd2");
+    } else if (e.target.classList.contains("editBtn")) {
+      const tx = user.expenses[index];
+      amountInput.value = tx.amount;
+      typeInput.value = tx.type;
+      categoryInput.value = tx.category;
+      dateInput.value = tx.date;
+      addBtn.textContent = "Update";
+      editIndex = index;
+      showMessage("✏️ Editing transaction...", "#fff9c4");
+      return;
+    }
+
+    // Save and refresh
+    const updatedUsers = users.map(u => u.email === user.email ? user : u);
+    localStorage.setItem("users", JSON.stringify(updatedUsers));
+    localStorage.setItem("currentUser", JSON.stringify(user));
+    loadTransactions();
+  });
+
+  document.getElementById("logoutBtn").addEventListener("click", () => {
+    localStorage.removeItem("currentUser");
+    window.location.href = "login.html";
+  });
+
+  loadTransactions();
+</script>
+
+
+</body>
+</html>
